@@ -35,4 +35,3 @@ f_wt = mean(control_data);
 
 escore = log10((f_wt*tmp_dko(:,1))./(tmp_sko(:,1)*rfx1(1)));
 end
-
