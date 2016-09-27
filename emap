@@ -1,0 +1,37 @@
+%% escore.m 
+% escore.m  calcuates the logarithmic multiplicative $\epislon$ score used
+% to infer statistical genetic interactions. It follows the form developed
+% and published by Phenix et al. (2013).
+%           - sko_orfs = ORFs of single-mutants
+%           - dko_orfs = ORFs of double-mutants
+%           - sko = vector of single-mutant fitness measures
+%           - dko = vector of double-mutant fitness measures
+%
+% created by:    Nada Elnour
+% last modified: 25.05.2016 3:17 pm
+
+%%
+function escore = emap(sko_orfs, sko, dko_orfs, dko)
+
+for i = 1:length(dko_orfs)
+    dko_orfs{i} = regexprep(dko_orfs{i},'\W','');
+end
+
+for i = 1:length(sko_orfs)
+    sko_orfs{i} = regexprep(sko_orfs{i},'\W','');
+end
+
+[common isko idko] = intersect(sko_orfs, dko_orfs,'stable');
+tmp_sko = sko(isko,:);
+tmp_dko = dko(idko,:);
+tmp = 'YLR176C';
+rfx1 = sko(find(strcmp(sko_orfs,tmp)),:);
+
+controls = {'YOR202W','YEL021W','YDL227C','YCL018W'};
+
+tmp = ismember(sko_orfs,controls);
+control_data = sko(tmp);
+f_wt = mean(control_data);
+
+escore = log10((f_wt*tmp_dko(:,1))./(tmp_sko(:,1)*rfx1(1)));
+end
