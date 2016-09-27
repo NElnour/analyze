@@ -1,0 +1,87 @@
+%% go.m
+% This script calculates the complement hypergeometric probability using
+% the manually-curated Gene Ontology (GO) databases provided by SGD. Prior
+% to intializing the script, ensure that curated databases are restructured
+% by column. For example:
+%       [Column 1]  [Column 2]   [Column 3]..... [Column n]
+%       Systematic   Common        GO ID            GO
+%         name        name
+%
+% created by:    Nada Elnour
+% last modified: 25.05.2016 3:26 pm
+%% Load curated database to workspace
+
+conditions = {'0%', '0015%', '0060%'};
+% goslimmapping = importdata('go_slim_mapping.xlsx');
+goslimmapping = importdata('GO_Slim_Complexes.xlsx');
+
+for i = 1: size(goslimmapping.textdata,1)
+    ORFs{i} = goslimmapping.textdata{i,4};
+    %ORFs{i} = goslimmapping{i,1}; % for go_slim_mapping
+    ORFs{i} = regexprep(ORFs{i}, '\W','');
+    
+    database_GO{i} = goslimmapping.textdata{i,1};
+    %database_GO{i} = goslimmapping{i,5}; % for go_slim_mapping
+    database_GO{i} = regexprep(database_GO{i}, '''',''); 
+end
+
+database_GO_unique = unique(database_GO); % unique GO terms in the entire 
+                                          % database
+
+for i = 1:length(database_GO_unique)
+    tmp = {database_GO_unique{i}};
+    membership = strcmp(database_GO, tmp);
+    ORFs_matched{i} = ORFs(membership);
+end
+
+background_list = [database_GO_unique; ORFs_matched]';
+
+% Load list of hits to workspace
+compiled_pvals = [];
+
+for c = 1:length(condition)
+    
+    filename = sprintf('outliers_%s_mms_peak.xlsx',condition{c});
+    ranked = importdata(filename);
+    
+    for i = 1:length(ranked)
+        ranked{i} = regexprep(ranked{i}, '\W','');
+    end
+    
+    for i = 1:length(ORFs_matched)
+        temp_background = background_list{i,2} ;
+        temp = ranked;
+        
+        [C ia ib] = intersect(temp, temp_background);
+        query_hits{i} = C;
+        number_of_hits(i) = numel(query_hits{i});
+    end
+    
+    N = length(ranked); % total # of genes in query
+    M = length(unique(ORFs)); % total # of S. cerevisiae ORFs
+    
+    for i = 1:length(database_GO_unique)
+        X(i) = number_of_hits(i); % # of genes that match GOid from input 
+                                  % query
+        K(i) = length(background_list{i,2});% total # of genes in GOid from 
+                                            % SGD
+        p_vals(i) = hygecdf(X(i), M, K(i), N, 'upper')'; 
+    end
+    
+    compiled_pvals = [compiled_pvals; p_vals];
+    
+    for i = 1:length(background_list)
+        Output{i,1} = background_list{i,1};
+        Output{i,2} = background_list{i,2};
+        Output{i,3} = number_of_hits(i);
+        Output{i,4} = p_vals(i);
+    end
+    %% Save
+    
+    fields = {'GOTerm' 'FullListofGenes' 'NumberofHits' 'P_vals'};
+    Output = cell2struct(Output, fields, 2);
+    
+    save(sprintf('GO_Slim_lowpeak_complex_%smms', condition{c}), 'Output')
+    
+    clear Output
+end
