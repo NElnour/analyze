@@ -1,0 +1,97 @@
+%% auc_score
+% auc_score calculates the normalized AUCs and P-values of linearized GFP
+% and BFP.
+% Running script intializes window to enter the plate #. Make sure .MAT
+% file names containing FCS data follow the same convention; change
+% convention in filename; change Drug to concentration of interest
+%
+%
+% created by:    Nada Elnour
+% created on:    01.03.2016
+% last Modified: 25.05.2016
+
+clc; clear all
+
+%% Load Data
+prompt={'Enter plate number'};
+name = 'Plate number';
+options.Interpreter = 'tex';
+defaultans = {'0'};
+Plate = inputdlg(prompt,name,[1 40],defaultans,options);
+
+filename = sprintf('gated_Plate %d_high_MMS.mat',str2num(Plate{1}));
+load(filename)
+
+Drug = 60; % drug dose; change per need
+channels = 1:200; % rescale from 2^16 channels to this range
+ORFs = {samples.label};
+event_count = cell2mat({samples.event_count});
+
+control_idx = [1 2 95 96];
+
+% Linearize Data
+for p = 1:96
+    for j = 1:size(samples(p).data,1) %event_count(p)
+        BFP_samples(j,p) = { 0.1024*(exp(0.008995*samples(p).data(j,4))) }; % empirically-derived transformation for Cyan ADP 9.0
+        GFP_samples(j,p) = { 0.1024*(exp(0.008995*samples(p).data(j,3))) };
+    end
+end
+
+BFP_samples(cellfun(@isempty,GFP_samples)) = {nan};
+GFP_samples(cellfun(@isempty,GFP_samples)) = {nan};
+
+gfp_samples = cell2mat(GFP_samples);
+bfp_samples = cell2mat(BFP_samples);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% CDF profiles and AUC scores for outlier IDs
+
+% Lin-binned Fluorescence Profiles
+
+samples_BFP = histc(bfp_samples,channels);
+samples_GFP = histc(gfp_samples,channels);
+
+% CDFs of BFP and GFP
+for s = 1: size(gfp_samples,2)   
+    samples_cBFP(:,s) = cumsum(samples_BFP(:,s)/sum(samples_BFP(:,s)));
+    samples_cGFP(:,s) = cumsum(samples_GFP(:,s)/sum(samples_GFP(:,s)));
+end
+
+gfp_cont = samples_GFP(:,control_idx);
+bfp_cont = bfp_samples(:,control_idx);
+
+weighted_gfp = bsxfun(@times, samples_cGFP, channels');
+auc_gfp = trapz(weighted_gfp);
+
+auc_ctrls = auc_gfp(:,control_idx);
+M = mean(auc_ctrls);
+V = var(auc_ctrls);
+
+auc_norm = (M-auc_gfp)/sqrt(V)/sqrt(4); % Z_{AUC} score
+
+for i = 1:length(auc_norm)
+    if auc_norm(i) < 0
+        p_vals(i) = 1-erf(-auc_norm(i));
+    else
+        p_vals(i) = 1-erf(auc_norm(i));
+    end
+end
+
+p_vals(isnan(p_vals)) = 1;
+
+id = event_count > 500;
+low = ORFs(~id);
+ORFs = ORFs(id);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Save Variables
+for x = 1:length(ORFs)
+    ORFs{x} = regexprep(ORFs{x},'''','');
+end
+
+output = [ORFs; num2cell(auc_gfp(id)); num2cell(auc_norm(id)); num2cell(p_vals(id))];
+save(sprintf('AUC Plate %d %d%% MMS', str2num(Plate{1}), Drug),'output','channels', 'samples_cGFP','samples_cBFP', 'samples_BFP', 'samples_GFP','gfp_samples', 'bfp_samples','auc_norm','p_vals','low')
+
+display(sprintf('Plate %d done', str2num(Plate{1})))
+
+
