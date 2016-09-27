@@ -1,5 +1,5 @@
-%% escore.m 
-% escore.m  calcuates the logarithmic multiplicative $\epislon$ score used
+%% emap.m 
+% escore.m  calcuates the logarithmic multiplicative \epislon score used
 % to infer statistical genetic interactions. It follows the form developed
 % and published by Phenix et al. (2013).
 %           - sko_orfs = ORFs of single-mutants
@@ -24,10 +24,10 @@ end
 [common isko idko] = intersect(sko_orfs, dko_orfs,'stable');
 tmp_sko = sko(isko,:);
 tmp_dko = dko(idko,:);
-tmp = 'YLR176C';
+tmp = 'YLR176C'; % searches for raw AUC score of single mutant 1
 rfx1 = sko(find(strcmp(sko_orfs,tmp)),:);
 
-controls = {'YOR202W','YEL021W','YDL227C','YCL018W'};
+controls = {'YOR202W','YEL021W','YDL227C','YCL018W'}; % 4 neutral mutants' scores will be used as a WT fitness score
 
 tmp = ismember(sko_orfs,controls);
 control_data = sko(tmp);
@@ -35,3 +35,4 @@ f_wt = mean(control_data);
 
 escore = log10((f_wt*tmp_dko(:,1))./(tmp_sko(:,1)*rfx1(1)));
 end
+
