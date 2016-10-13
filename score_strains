@@ -27,38 +27,37 @@ channels = 1:200; % rescale from 2^16 channels to this range
 ORFs = {samples.label};
 event_count = cell2mat({samples.event_count});
 
-control_idx = [1 2 95 96];
+control_idx = [1 2 95 96]; % indices of controls on well plates
 
-% Linearize Data
+FL1 = strmatch('FL 1 Log',samples(1).par_names);
+FL6 = strmatch('FL 6 Log', matFile(1).par_names);
+gfp = [];
+bfp = [];
+
 for p = 1:96
-    for j = 1:size(samples(p).data,1) %event_count(p)
-        BFP_samples(j,p) = { 0.1024*(exp(0.008995*samples(p).data(j,4))) }; % empirically-derived transformation for Cyan ADP 9.0
-        GFP_samples(j,p) = { 0.1024*(exp(0.008995*samples(p).data(j,3))) };
-    end
+    bfp = catpad(2, samples(p).data(:,FL6));
+    gfp = catpad(2,gfp,samples(p).data(:,FL1));
 end
 
-BFP_samples(cellfun(@isempty,GFP_samples)) = {nan};
-GFP_samples(cellfun(@isempty,GFP_samples)) = {nan};
-
-gfp_samples = cell2mat(GFP_samples);
-bfp_samples = cell2mat(BFP_samples);
+gfp = 0.1024.*(exp(0.008995*gfp));
+bfp = 0.1024.*(exp(0.008995*bfp));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% CDF profiles and AUC scores for outlier IDs
 
 % Lin-binned Fluorescence Profiles
 
-samples_BFP = histc(bfp_samples,channels);
-samples_GFP = histc(gfp_samples,channels);
+samples_BFP = histc(bfp,channels);
+samples_GFP = histc(gfp,channels);
 
 % CDFs of BFP and GFP
-for s = 1: size(gfp_samples,2)   
+for s = 1: size(gfp_samples,2)
     samples_cBFP(:,s) = cumsum(samples_BFP(:,s)/sum(samples_BFP(:,s)));
     samples_cGFP(:,s) = cumsum(samples_GFP(:,s)/sum(samples_GFP(:,s)));
 end
 
-gfp_cont = samples_GFP(:,control_idx);
-bfp_cont = bfp_samples(:,control_idx);
+gfp_cont = gfp(:,control_idx);
+bfp_cont = bfp(:,control_idx);
 
 weighted_gfp = bsxfun(@times, samples_cGFP, channels');
 auc_gfp = trapz(weighted_gfp);
@@ -67,7 +66,7 @@ auc_ctrls = auc_gfp(:,control_idx);
 M = mean(auc_ctrls);
 V = var(auc_ctrls);
 
-auc_norm = (M-auc_gfp)/sqrt(V)/sqrt(4); % Z_{AUC} score
+auc_norm = (M-auc_gfp)/sqrt(V)/sqrt(4); % Normalized AUC score
 
 for i = 1:length(auc_norm)
     if auc_norm(i) < 0
@@ -93,5 +92,3 @@ output = [ORFs; num2cell(auc_gfp(id)); num2cell(auc_norm(id)); num2cell(p_vals(i
 save(sprintf('AUC Plate %d %d%% MMS', str2num(Plate{1}), Drug),'output','channels', 'samples_cGFP','samples_cBFP', 'samples_BFP', 'samples_GFP','gfp_samples', 'bfp_samples','auc_norm','p_vals','low')
 
 display(sprintf('Plate %d done', str2num(Plate{1})))
-
-
