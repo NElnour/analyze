@@ -8,7 +8,9 @@
 %
 % created by:    Nada Elnour
 % created on:    01.03.2016
-% last Modified: 25.05.2016
+%
+% Changes use Jonathan Sullivan's catpad.m [Copyright (c) 2011, Jonathan Sullivan Copyright (c) 2011, Michael Völker].
+% last Modified: 13.10.2016
 
 clc; clear all
 
